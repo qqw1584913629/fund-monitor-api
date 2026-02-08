@@ -1,0 +1,26 @@
+# fly.toml 配置文件
+app = "fund-monitor-api"
+primary_region = "hkg"
+
+[build]
+  builder = "heroku/buildpacks:20"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    interval = 15000
+    timeout = 5000
+    path = "/health"

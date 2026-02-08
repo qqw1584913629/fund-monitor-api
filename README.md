@@ -44,32 +44,11 @@ GET /api/gold/history?days=30
 **参数：**
 - `days`: 获取天数（默认 30 天，最大 720 天）
 
-**返回示例：**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "date": "2024-01-15",
-      "close": 482.50,
-      "open": 480.20,
-      "high": 483.10,
-      "low": 479.80
-    }
-  ],
-  "count": 30
-}
-```
-
 ### 2. 个股新闻
 
 ```
 GET /api/news/stock?symbol=600519&limit=10
 ```
-
-**参数：**
-- `symbol`: 股票/基金代码
-- `limit`: 返回数量限制（默认 10 条）
 
 ### 3. 财经快讯
 
@@ -77,18 +56,11 @@ GET /api/news/stock?symbol=600519&limit=10
 GET /api/news/financial?symbol=全部&limit=50
 ```
 
-**参数：**
-- `symbol`: 品种符号（可选：全部、重要、VIP、贵金属、铜、铝、铅、锌、镍、锡）
-- `limit`: 返回数量限制（默认 50 条）
-
 ### 4. 央视新闻
 
 ```
 GET /api/news/cctv?date=20240115
 ```
-
-**参数：**
-- `date`: 日期，格式：YYYYMMDD（可选，默认今天）
 
 ### 5. 财经头条
 
@@ -102,8 +74,32 @@ GET /api/news/headlines
 GET /api/news/fastbull?limit=20
 ```
 
-**参数：**
-- `limit`: 返回数量限制（默认 20 条）
+## ☁️ 云平台部署
+
+> 📘 **详细部署指南**: 查看 [DEPLOYMENT.md](DEPLOYMENT.md) 获取完整部署说明
+
+### Hugging Face Spaces（推荐，永久免费）
+
+1. 访问 https://huggingface.co/spaces
+2. 点击 "Create new Space" → 选择 **Docker** SDK
+3. 将 `Dockerfile.hf` 重命名为 `Dockerfile`
+4. 上传代码，自动部署
+
+### Railway（推荐，最简单）
+
+1. 访问 https://railway.app/
+2. "New Project" → "Deploy from GitHub repo"
+3. 选择你的仓库，自动部署
+
+### Render（免费）
+
+1. 访问 https://render.com/
+2. "New" → "Web Service" → 连接 GitHub
+3. Start Command: `uvicorn api_service.main:app --host 0.0.0.0 --port $PORT`
+
+---
+
+> ⚠️ **Cloudflare 不支持 Python**，请使用上述平台替代。详见 [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## 📁 项目结构
 
@@ -114,47 +110,9 @@ fund-monitor-api/
 ├── config.py            # 配置文件
 ├── fund_core.py         # 数据获取核心模块
 ├── requirements.txt     # Python 依赖
-├── .gitignore           # Git 忽略文件
 └── README.md            # 项目说明
 ```
-
-## ⚙️ 配置
-
-所有配置项都在 `config.py` 文件中：
-
-```python
-# 网络配置
-REQUEST_TIMEOUT = 10      # 请求超时（秒）
-MAX_WORKERS = 5           # 并发请求数
-
-# 日志配置
-LOG_LEVEL = 'INFO'        # 日志级别
-LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-
-# 版本信息
-VERSION = "1.0.0"
-```
-
-## 🛠️ 技术栈
-
-- **Python 3.8+**
-- **FastAPI** - 高性能 Web 框架
-- **AKShare** - 金融数据接口
-- **Pandas** - 数据处理
-- **Requests** - HTTP 请求
-- **BeautifulSoup4** - HTML 解析
-
-## ⚠️ 注意事项
-
-1. **数据来源限制**：部分数据源可能有访问频率限制，请合理使用
-2. **时效性**：新闻数据可能存在延迟，具体延迟时间取决于数据源
-3. **CCTV 新闻**：最早支持 2016-02-03 的数据
-4. **FastBull**：需要安装 `beautifulsoup4` 才能使用
 
 ## 📄 License
 
 MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
