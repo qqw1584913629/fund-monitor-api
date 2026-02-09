@@ -8,6 +8,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sys
 import os
+import asyncio
+import threading
+import requests
+import logging
 
 # 添加父目录到路径，这样能导入 fund_core
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,6 +29,9 @@ import pandas as pd
 import numpy as np
 from config import VERSION
 
+# 配置日志
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="财经数据 API 服务",
     description="提供黄金历史价格和多种新闻资讯数据接口",
@@ -39,6 +46,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ========== 保活机制 ==========
+# 你的 Render 服务 URL（部署后修改为你的实际 URL）
+KEEP_ALIVE_URL = "https://fund-monitor-api.onrender.com"
+KEEP_ALIVE_INTERVAL = 300  # 5分钟（300秒）
+
+
+def self_ping_worker():
+    """
+    后台线程：定时请求自己的 /ping 端点，防止 Render 空闲关机
+    每 5 分钟自动 ping 一次
+    """
+    logger.info(f"🔄 保活线程已启动，每 {KEEP_ALIVE_INTERVAL} 秒 ping 一次")
+
+    while True:
+        try:
+            threading.Event().wait(KEEP_ALIVE_INTERVAL)
+            response = requests.get(f"{KEEP_ALIVE_URL}/ping", timeout=10)
+            logger.info(f"[保活] Ping 状态: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"[保活] Ping 失败: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时触发"""
+    # 启动后台保活线程
+    keep_alive_thread = threading.Thread(target=self_ping_worker, daemon=True)
+    keep_alive_thread.start()
+    logger.info(f"✅ 保活机制已启用，每 {KEEP_ALIVE_INTERVAL} 秒 ping {KEEP_ALIVE_URL}/ping")
 
 
 # ========== 数据模型 ==========
@@ -85,7 +123,24 @@ async def root():
 @app.get("/health")
 async def health_check():
     """健康检查"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "fund-monitor-api"}
+
+
+@app.get("/ping")
+async def ping():
+    """
+    保活端点 - 用于外部服务定时 ping 防止 Render 空闲关机
+
+    使用方法：
+    - 设置 UptimeRobot 或 cron-job.org 定时访问此端点
+    - 建议间隔：5-10 分钟
+    - 示例：https://你的服务名.onrender.com/ping
+    """
+    return {
+        "status": "ok",
+        "message": "pong",
+        "timestamp": pd.Timestamp.now().isoformat()
+    }
 
 
 @app.get("/api/gold/history")

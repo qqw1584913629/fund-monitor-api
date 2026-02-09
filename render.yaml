@@ -8,4 +8,8 @@ services:
     envVars:
       - key: PORT
         value: 8080
+      - key: KEEP_ALIVE_URL
+        # Render 自动提供 RENDER_EXTERNAL_URL 环境变量
+        value: https://fund-monitor-api.onrender.com
+        # 部署后记得修改为你的实际 URL，或使用 $RENDER_EXTERNAL_URL
     healthCheckPath: /health

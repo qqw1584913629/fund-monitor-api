@@ -6,6 +6,7 @@ import requests
 import logging
 import akshare as ak
 import pandas as pd
+import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Dict, List, Any
@@ -72,14 +73,22 @@ def get_fund_daily_ranking(limit: int = 100, symbol: str = "全部") -> pd.DataF
         - 使用 fund_open_fund_rank_em 接口（比 fund_open_fund_daily_em 快 4 倍）
         - 按类型筛选可进一步提升速度
     """
-    try:
-        logger.info(f"正在获取基金实时排行数据 (类型: {symbol})")
+    total_start = time.time()
 
-        # 使用更快的排行接口（比 fund_open_fund_daily_em 快 4 倍）
+    try:
+        logger.info(f"[性能] 开始获取基金排行数据 (类型: {symbol}, 限制: {limit}条)")
+
+        # 调用 API
+        api_start = time.time()
         df = ak.fund_open_fund_rank_em(symbol=symbol)
+        api_elapsed = time.time() - api_start
+        logger.info(f"[性能] API 调用耗时: {api_elapsed:.2f}秒")
 
         if df is not None and not df.empty:
-            # 重命名列，统一命名规范
+            logger.info(f"[性能] 获取原始数据: {len(df)}条")
+
+            # 重命名列
+            process_start = time.time()
             column_mapping = {
                 '基金代码': 'code',
                 '基金简称': 'name',
@@ -89,23 +98,31 @@ def get_fund_daily_ranking(limit: int = 100, symbol: str = "全部") -> pd.DataF
                 '净值日期': 'date'
             }
 
-            # 只保留存在的列
             existing_columns = {k: v for k, v in column_mapping.items() if k in df.columns}
             df = df[list(existing_columns.keys())].rename(columns=existing_columns)
 
-            # 按日增长率排序（涨的在前）
+            # 按日增长率排序
             if 'daily_growth_rate' in df.columns:
                 df['daily_growth_rate'] = df['daily_growth_rate'].replace('%', '', regex=True)
                 df['daily_growth_rate'] = pd.to_numeric(df['daily_growth_rate'], errors='coerce')
                 df = df.sort_values('daily_growth_rate', ascending=False)
 
+            process_elapsed = time.time() - process_start
+
             # 限制返回数量
             result_df = df.head(limit)
-            logger.info(f"成功获取 {len(df)} 只基金数据，返回前 {len(result_df)} 只")
+            total_elapsed = time.time() - total_start
+
+            logger.info(f"[性能] 数据处理耗时: {process_elapsed:.3f}秒")
+            logger.info(f"[性能] 总耗时: {total_elapsed:.2f}秒")
+            logger.info(f"[性能] 返回前 {len(result_df)} 条数据 (共 {len(df)} 条)")
+            logger.info(f"[性能] 前3名涨幅: {result_df['daily_growth_rate'].head(3).tolist()}")
+
             return result_df
 
     except Exception as e:
-        logger.warning(f"获取基金排行失败: {e}")
+        total_elapsed = time.time() - total_start
+        logger.error(f"[性能] 获取失败 (耗时: {total_elapsed:.2f}秒): {e}")
 
     return pd.DataFrame()
 
