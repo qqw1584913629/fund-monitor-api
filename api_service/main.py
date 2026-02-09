@@ -18,7 +18,8 @@ from fund_core import (
     get_financial_news,
     get_cctv_news,
     get_financial_headlines,
-    get_fastbull_news
+    get_fastbull_news,
+    get_fund_daily_ranking
 )
 import pandas as pd
 import numpy as np
@@ -51,6 +52,16 @@ class GoldPrice(BaseModel):
     volume: Optional[int] = None   # 成交量
 
 
+class FundRanking(BaseModel):
+    """基金排行数据模型"""
+    code: str                              # 基金代码
+    name: str                              # 基金名称
+    net_value: Optional[float] = None      # 单位净值
+    accumulated_net_value: Optional[float] = None  # 累计净值
+    daily_growth_rate: Optional[float] = None      # 日增长率(%)
+    date: Optional[str] = None             # 净值日期
+
+
 # ========== 接口 ==========
 @app.get("/")
 async def root():
@@ -61,6 +72,7 @@ async def root():
         "status": "running",
         "endpoints": {
             "国内黄金历史": "/api/gold/history?days=30",
+            "基金涨跌幅排行": "/api/fund/ranking?limit=100",
             "个股新闻": "/api/news/stock?symbol=600519",
             "财经快讯": "/api/news/financial",
             "财新头条": "/api/news/headlines",
@@ -128,6 +140,71 @@ async def get_gold_history_endpoint(days: int = 30):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取数据失败: {str(e)}")
+
+
+# ========== 基金数据接口 ==========
+@app.get("/api/fund/ranking")
+async def get_fund_ranking_endpoint(limit: int = 100):
+    """
+    获取所有基金当日涨跌幅排行
+
+    参数:
+        limit: 返回数量限制（默认100只基金）
+
+    返回:
+        {
+            "success": true,
+            "data": [...],
+            "count": 100
+        }
+
+    数据说明:
+        - code: 基金代码
+        - name: 基金名称
+        - net_value: 单位净值
+        - accumulated_net_value: 累计净值
+        - daily_growth_rate: 日增长率(%)
+        - date: 净值日期
+    """
+    try:
+        # 限制最大返回数量
+        limit = min(limit, 500)
+
+        # 调用 fund_core 中的函数
+        df = get_fund_daily_ranking(limit=limit)
+
+        if df.empty:
+            return {
+                "success": False,
+                "message": "暂无数据",
+                "data": [],
+                "count": 0
+            }
+
+        # 转换DataFrame为JSON
+        data_list = []
+        for _, row in df.iterrows():
+            item = {}
+            for col in df.columns:
+                val = row[col]
+                if pd.isna(val):
+                    item[col] = None
+                elif isinstance(val, (pd.Timestamp, np.datetime64)):
+                    item[col] = str(val)
+                elif isinstance(val, (np.integer, np.floating)):
+                    item[col] = float(val)
+                else:
+                    item[col] = val
+            data_list.append(item)
+
+        return {
+            "success": True,
+            "data": data_list,
+            "count": len(data_list)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取基金排行失败: {str(e)}")
 
 
 # ========== 新闻资讯接口 ==========
@@ -386,10 +463,19 @@ async def get_cctv_news_endpoint(date: Optional[str] = None):
 
 if __name__ == "__main__":
     import uvicorn
+    import sys
+    import io
+
+    # 设置标准输出编码为 UTF-8
+    if sys.platform == "win32":
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
     print("=" * 60)
-    print("🚀 Project A 数据服务启动中...")
-    print("📍 API地址: http://localhost:5000")
-    print("📖 文档地址: http://localhost:5000/docs")
+    print("API 服务启动中...")
+    print(f"API地址: http://localhost:5000")
+    print(f"文档地址: http://localhost:5000/docs")
+    print(f"基金排行接口: http://localhost:5000/api/fund/ranking")
     print("=" * 60)
 
     uvicorn.run(app, host="0.0.0.0", port=5000)
