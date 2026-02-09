@@ -59,7 +59,6 @@ class FundRanking(BaseModel):
     net_value: Optional[float] = None      # 单位净值
     accumulated_net_value: Optional[float] = None  # 累计净值
     daily_growth_rate: Optional[float] = None      # 日增长率(%)
-    date: Optional[str] = None             # 净值日期
 
 
 # ========== 接口 ==========
@@ -144,12 +143,14 @@ async def get_gold_history_endpoint(days: int = 30):
 
 # ========== 基金数据接口 ==========
 @app.get("/api/fund/ranking")
-async def get_fund_ranking_endpoint(limit: int = 100):
+async def get_fund_ranking_endpoint(limit: int = 100, symbol: str = "全部"):
     """
     获取所有基金当日涨跌幅排行
 
     参数:
-        limit: 返回数量限制（默认100只基金）
+        limit: 返回数量限制（默认100只基金，最大500）
+        symbol: 基金类型（默认"全部"）
+                可选: "股票型", "混合型", "债券型", "指数型", "QDII", "FOF"
 
     返回:
         {
@@ -164,14 +165,18 @@ async def get_fund_ranking_endpoint(limit: int = 100):
         - net_value: 单位净值
         - accumulated_net_value: 累计净值
         - daily_growth_rate: 日增长率(%)
-        - date: 净值日期
+
+    性能说明:
+        - 全部基金: ~4秒
+        - 股票型: ~1.5秒
+        - 混合型/债券型: 更快
     """
     try:
         # 限制最大返回数量
         limit = min(limit, 500)
 
         # 调用 fund_core 中的函数
-        df = get_fund_daily_ranking(limit=limit)
+        df = get_fund_daily_ranking(limit=limit, symbol=symbol)
 
         if df.empty:
             return {
